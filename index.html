@@ -82,6 +82,10 @@
             </div>
             <button type="submit" class="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Giriş Yap</button>
             <p id="error-message" class="text-red-400 text-center text-sm mt-2 hidden"></p>
+            <div id="debug-info" class="text-gray-400 text-sm mt-4 hidden">
+                <p>Oluşturulan Hash:</p>
+                <pre id="debug-hash" class="whitespace-pre-wrap break-all"></pre>
+            </div>
         </form>
     </div>
 
@@ -127,20 +131,32 @@
         </div>
     </div>
 
-    <script>
-        //---------------------------------------------------------
-        // GÜVENLİK BİLGİLENDİRMESİ
-        // Bu bir demo uygulamasıdır. Veriler tarayıcı belleğinde saklanır.
-        // Tarayıcı kapatıldığında tüm veriler silinir. Gerçek bir uygulama
-        // için sunucu ve veritabanı gereklidir.
-        //---------------------------------------------------------
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, getDoc, doc, addDoc, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Global Firebase ve Uygulama Değişkenleri
+        let db;
+        let auth;
+        let currentPath = '/';
+        let pathHistory = [];
+
+        // Güvenlik Kimlik Bilgileri
+        const _credentials = {
+            user: "prestijtedarik",
+            passHash: "72743a3ae2513268255e3279a2c3f9f1bf3b64e9cc1864fac7f0c65d119fc606"
+        };
+        
+        // DOM Elementleri
         const loginContainer = document.getElementById('login-container');
         const fileManagerContainer = document.getElementById('file-manager-container');
         const loginForm = document.getElementById('login-form');
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
         const errorMessage = document.getElementById('error-message');
+        const debugInfo = document.getElementById('debug-info');
+        const debugHash = document.getElementById('debug-hash');
         const logoutButton = document.getElementById('logout-button');
         const fileListPane = document.getElementById('file-list-pane');
         const fileContentPane = document.getElementById('file-content-pane');
@@ -156,117 +172,131 @@
         const messageText = document.getElementById('message-text');
         const messageOkButton = document.getElementById('message-ok-button');
 
-        // Şifre artık doğrudan gözükmeyen bir değişkene atandı
-        // NOT: Bu sadece bir demo içindir. Bu bilgileri canlı bir ortamda ASLA bu şekilde tutmayın.
-        const _credentials = { user: "yagiztasyon", pass: "yagiz5454" };
+        // Firestore ve Kimlik Doğrulama
+        window.onload = async () => {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
 
-        // Sanal dosya sistemi için başlangıç verileri
-        const initialFileSystem = {
-            'Stoklar': {
-                type: 'folder',
-                children: {
-                    'oyun-stok.txt': { type: 'file', content: 'Valorant: 10 adet\nLeague of Legends: 5 adet' },
-                    'koleksiyon.txt': { type: 'file', content: 'Efsanevi hesaplar\n...\n...' }
-                }
-            },
-            'Belgeler': {
-                type: 'folder',
-                children: {
-                    'genel-sirket-bilgileri.txt': { type: 'file', content: 'Şirket adı: Prestij Tedarik\nAdres: Sanal Sokak, Bulut No: 1' },
-                    'urun-fotograflari-listesi.txt': { type: 'file', content: 'oyun-fotografi-1.png\noyun-fotografi-2.jpeg' }
-                }
-            },
-            'README.txt': { type: 'file', content: 'Bu bir Dosya Yöneticisi demosu.\nKlasörlere tıklayarak içlerine girebilirsiniz.\nDosyalara tıklayarak içeriklerini görebilirsiniz.' }
+                // onAuthStateChanged ile oturum durumunu dinle
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        console.log("Firebase'e başarılı bir şekilde bağlandı.");
+                        // Giriş yapıldıysa dosya listesini dinle
+                        listenToFileSystem();
+                    } else {
+                        console.log("Firebase oturum açmadı.");
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase'i başlatırken bir hata oluştu:", e);
+                showMessage("Veritabanına bağlanılamadı. Lütfen tekrar deneyin.");
+            }
         };
 
-        let fileSystem = {};
-        let currentDirectory = fileSystem;
-        let pathHistory = [];
-
-        // Dosya sistemini localStorage'a kaydetme fonksiyonu
-        function saveFileSystem() {
-            localStorage.setItem('fileSystem', JSON.stringify(fileSystem));
-        }
-
-        // Dosya sistemini localStorage'dan yükleme fonksiyonu
-        function loadFileSystem() {
-            const savedFileSystem = localStorage.getItem('fileSystem');
-            if (savedFileSystem) {
-                fileSystem = JSON.parse(savedFileSystem);
-            } else {
-                fileSystem = initialFileSystem;
-            }
+        // SHA-256 Hash Fonksiyonu
+        async function sha256(message) {
+            const textAsBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', textAsBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hexHash;
         }
         
+        // Mesaj Kutusu Göster
         function showMessage(message) {
             messageText.textContent = message;
             messageBox.classList.remove('hidden');
         }
 
+        // Mesaj Kutusu Kapat
         messageOkButton.addEventListener('click', () => {
             messageBox.classList.add('hidden');
         });
 
-        function renderFileList() {
-            fileList.innerHTML = '';
-            
-            // Eğer bir üst dizin varsa '..' ekle
-            if (pathHistory.length > 0) {
-                const backItem = document.createElement('div');
-                backItem.classList.add('flex', 'items-center', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'nav-item');
-                backItem.innerHTML = `<span class="text-xl mr-3">📁</span> <span class="font-semibold">.. (Geri)</span>`;
-                backItem.addEventListener('click', navigateUp);
-                fileList.appendChild(backItem);
-            }
+        // Firebase Firestore'dan verileri dinle
+        function listenToFileSystem() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const filesRef = collection(db, `artifacts/${appId}/public/data/files`);
+            const q = query(filesRef, where('parentPath', '==', currentPath));
 
-            for (const name in currentDirectory) {
-                const item = currentDirectory[name];
-                const itemElement = document.createElement('div');
-                itemElement.classList.add('flex', 'items-center', 'justify-between', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'file-item', 'scale-in');
-                
-                let icon = item.type === 'folder' ? '📁' : '📄';
-                
-                const nameSpan = document.createElement('span');
-                nameSpan.classList.add('font-semibold', 'flex-grow');
-                nameSpan.innerHTML = `<span class="text-xl mr-3">${icon}</span>${name}`;
-                
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'Sil';
-                deleteButton.classList.add('py-1', 'px-3', 'bg-red-500', 'hover:bg-red-600', 'text-white', 'font-semibold', 'rounded-md', 'transition-colors', 'duration-200');
-                deleteButton.setAttribute('data-name', name);
-                
-                itemElement.appendChild(nameSpan);
-                itemElement.appendChild(deleteButton);
+            onSnapshot(q, (querySnapshot) => {
+                fileList.innerHTML = '';
+                const items = [];
+                querySnapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
 
-                if (item.type === 'folder') {
-                    nameSpan.addEventListener('click', () => navigateInto(name));
-                } else {
-                    nameSpan.addEventListener('click', () => showFileContent(item.content, name));
+                // Önce klasörleri, sonra dosyaları sırala
+                items.sort((a, b) => {
+                    if (a.type === 'folder' && b.type !== 'folder') return -1;
+                    if (a.type !== 'folder' && b.type === 'folder') return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                // Geri butonu
+                if (currentPath !== '/') {
+                    const backItem = document.createElement('div');
+                    backItem.classList.add('flex', 'items-center', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'nav-item');
+                    backItem.innerHTML = `<span class="text-xl mr-3">📁</span> <span class="font-semibold">.. (Geri)</span>`;
+                    backItem.addEventListener('click', navigateUp);
+                    fileList.appendChild(backItem);
                 }
-                
-                fileList.appendChild(itemElement);
-            }
+
+                // Dosya ve klasörleri listele
+                items.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.classList.add('flex', 'items-center', 'justify-between', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'file-item', 'scale-in');
+                    
+                    let icon = item.type === 'folder' ? '📁' : '📄';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.classList.add('font-semibold', 'flex-grow');
+                    nameSpan.innerHTML = `<span class="text-xl mr-3">${icon}</span>${item.name}`;
+                    
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Sil';
+                    deleteButton.classList.add('py-1', 'px-3', 'bg-red-500', 'hover:bg-red-600', 'text-white', 'font-semibold', 'rounded-md', 'transition-colors', 'duration-200');
+                    deleteButton.setAttribute('data-id', item.id);
+                    
+                    itemElement.appendChild(nameSpan);
+                    itemElement.appendChild(deleteButton);
+
+                    if (item.type === 'folder') {
+                        nameSpan.addEventListener('click', () => navigateInto(item.name));
+                    } else {
+                        nameSpan.addEventListener('click', () => showFileContent(item.content, item.name));
+                    }
+                    
+                    fileList.appendChild(itemElement);
+                });
+
+                updateBreadcrumbs();
+            }, (error) => {
+                console.error("Veri alınırken hata oluştu:", error);
+                showMessage("Dosyalara erişilemiyor. Lütfen tekrar deneyin.");
+            });
         }
 
-        function navigateInto(folderName) {
-            if (currentDirectory[folderName] && currentDirectory[folderName].type === 'folder') {
-                pathHistory.push(folderName);
-                currentDirectory = currentDirectory[folderName].children;
-                updateBreadcrumbs();
-                renderFileList();
-            }
+        async function navigateInto(folderName) {
+            pathHistory.push(folderName);
+            currentPath = pathHistory.join('/');
+            listenToFileSystem();
         }
 
-        function navigateUp() {
-            if (pathHistory.length > 0) {
-                pathHistory.pop();
-                currentDirectory = fileSystem;
-                for (const folder of pathHistory) {
-                    currentDirectory = currentDirectory[folder].children;
-                }
-                updateBreadcrumbs();
-                renderFileList();
-            }
+        async function navigateUp() {
+            pathHistory.pop();
+            currentPath = pathHistory.length === 0 ? '/' : pathHistory.join('/');
+            listenToFileSystem();
         }
 
         function showFileContent(content, fileName) {
@@ -303,19 +333,30 @@
             breadcrumbs.textContent = path;
         }
 
+        // Şifre alanına bir şey yazıldığında hash'i göster
+        passwordInput.addEventListener('input', async (e) => {
+            const typedPassword = e.target.value.trim();
+            if (typedPassword.length > 0) {
+                const typedHash = await sha256(typedPassword);
+                debugHash.textContent = typedHash;
+                debugInfo.classList.remove('hidden');
+            } else {
+                debugInfo.classList.add('hidden');
+            }
+        });
+
         // Login işlemi
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = usernameInput.value;
             const password = passwordInput.value.trim();
             
-            if (username === _credentials.user && password === _credentials.pass) {
-                loadFileSystem(); // Giriş yapınca dosyaları yükle
+            const hashedPassword = await sha256(password);
+            
+            if (username === _credentials.user && hashedPassword === _credentials.passHash) {
                 loginContainer.classList.add('hidden');
                 fileManagerContainer.classList.remove('hidden');
                 fileManagerContainer.classList.add('opacity-100', 'fade-in');
-                renderFileList();
-                updateBreadcrumbs();
             } else {
                 errorMessage.textContent = 'Hatalı kullanıcı adı veya şifre.';
                 errorMessage.classList.remove('hidden');
@@ -330,8 +371,8 @@
             usernameInput.value = '';
             passwordInput.value = '';
             errorMessage.classList.add('hidden');
+            currentPath = '/';
             pathHistory = [];
-            currentDirectory = fileSystem;
             updateBreadcrumbs();
         });
 
@@ -340,64 +381,71 @@
             fileUploadInput.click();
         });
 
-        fileUploadInput.addEventListener('change', (event) => {
+        fileUploadInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 const content = e.target.result;
                 const fileName = file.name;
 
-                if (currentDirectory[fileName]) {
-                    showMessage(`"${fileName}" adında bir dosya veya klasör zaten var.`);
-                    return;
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const filesRef = collection(db, `artifacts/${appId}/public/data/files`);
+                    await addDoc(filesRef, {
+                        name: fileName,
+                        type: 'file',
+                        content: content,
+                        parentPath: currentPath,
+                        createdAt: new Date()
+                    });
+                    showMessage(`"${fileName}" başarıyla yüklendi.`);
+                } catch (e) {
+                    console.error("Dosya yüklenirken hata oluştu:", e);
+                    showMessage("Dosya yüklenemedi. Lütfen tekrar deneyin.");
                 }
-
-                currentDirectory[fileName] = {
-                    type: 'file',
-                    content: content
-                };
-                
-                saveFileSystem();
-                renderFileList();
-                showMessage(`"${fileName}" başarıyla yüklendi.`);
             };
             reader.readAsText(file);
         });
 
         // Yeni klasör oluşturma
-        newFolderButton.addEventListener('click', () => {
+        newFolderButton.addEventListener('click', async () => {
             const folderName = prompt("Yeni klasör için bir isim girin:");
             if (folderName && folderName.trim() !== '') {
-                if (currentDirectory[folderName]) {
-                    showMessage(`"${folderName}" adında bir klasör zaten var.`);
-                    return;
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const filesRef = collection(db, `artifacts/${appId}/public/data/files`);
+                    await addDoc(filesRef, {
+                        name: folderName,
+                        type: 'folder',
+                        parentPath: currentPath,
+                        createdAt: new Date()
+                    });
+                    showMessage(`"${folderName}" klasörü oluşturuldu.`);
+                } catch (e) {
+                    console.error("Klasör oluşturulurken hata oluştu:", e);
+                    showMessage("Klasör oluşturulamadı. Lütfen tekrar deneyin.");
                 }
-                currentDirectory[folderName] = { type: 'folder', children: {} };
-                saveFileSystem();
-                renderFileList();
-                showMessage(`"${folderName}" klasörü oluşturuldu.`);
             }
         });
 
         // Silme işlemi için olay delegasyonu
-        fileList.addEventListener('click', (e) => {
+        fileList.addEventListener('click', async (e) => {
             const deleteButton = e.target.closest('button');
             if (deleteButton && deleteButton.textContent === 'Sil') {
-                const itemName = deleteButton.getAttribute('data-name');
-                const itemElement = deleteButton.closest('.file-item');
-                
-                itemElement.classList.add('fade-out');
-                itemElement.addEventListener('animationend', () => {
-                    delete currentDirectory[itemName];
-                    saveFileSystem();
-                    renderFileList();
+                const docId = deleteButton.getAttribute('data-id');
+                const itemName = deleteButton.previousElementSibling.textContent.trim().replace(/^. /, ''); // İkonu çıkar
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/files`, docId));
                     showMessage(`"${itemName}" başarıyla silindi.`);
-                }, { once: true });
+                } catch (e) {
+                    console.error("Öğe silinirken hata oluştu:", e);
+                    showMessage("Öğe silinemedi. Lütfen tekrar deneyin.");
+                }
             }
         });
-
     </script>
 </body>
 </html>
