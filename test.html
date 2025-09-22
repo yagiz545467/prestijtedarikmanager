@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prestij Tedarik - Dosya Yönetimi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container-bg {
+            background-color: #2d3748;
+        }
+        .card {
+            background-color: #2d3748;
+        }
+        .item-list-container {
+            min-height: 200px;
+        }
+        .file-item, .folder-item, .nav-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .file-item:hover, .folder-item:hover, .nav-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out forwards;
+        }
+        .fade-out {
+            animation: fadeOut 0.3s ease-in-out forwards;
+        }
+        .scale-in {
+            animation: scaleIn 0.3s ease-in-out;
+        }
+        .slide-in-right {
+            animation: slideInRight 0.5s ease-out forwards;
+        }
+        .slide-out-left {
+            animation: slideOutLeft 0.5s ease-in forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutLeft {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(-100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Login Ekranı -->
+    <div id="login-container" class="card p-8 rounded-2xl shadow-lg w-full max-w-sm transition-all duration-300 transform scale-100">
+        <h1 class="text-3xl font-bold text-center mb-6">Yönetici Girişi</h1>
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium mb-1">Kullanıcı Adı</label>
+                <input type="text" id="username" class="w-full p-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium mb-1">Şifre</label>
+                <input type="password" id="password" class="w-full p-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+            </div>
+            <button type="submit" class="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Giriş Yap</button>
+            <p id="error-message" class="text-red-400 text-center text-sm mt-2 hidden"></p>
+        </form>
+    </div>
+
+    <!-- Ana Dosya Yönetim Ekranı -->
+    <div id="file-manager-container" class="container-bg p-8 rounded-2xl shadow-lg w-full max-w-4xl transition-all duration-300 opacity-0 hidden">
+        <h1 class="text-3xl font-bold text-center mb-6">Prestij Tedarik - Dosya Yönetimi</h1>
+
+        <div class="flex flex-col md:flex-row justify-between items-center mb-4 space-y-2 md:space-y-0">
+            <div id="breadcrumbs" class="text-sm text-gray-400">Ana Dizin</div>
+            <div class="flex items-center space-x-2">
+                <button id="new-folder-button" class="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Yeni Klasör</button>
+                <input type="file" id="file-upload-input" class="hidden" accept=".txt">
+                <button id="upload-file-button" class="py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Dosya Yükle</button>
+                <button id="logout-button" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Çıkış Yap</button>
+            </div>
+        </div>
+
+        <div id="main-content" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Dosya ve Klasör Listesi -->
+            <div id="file-list-pane" class="md:col-span-2 p-6 rounded-lg bg-gray-700 shadow-lg item-list-container">
+                <h2 class="text-xl font-semibold mb-4">Dosyalar ve Klasörler</h2>
+                <div id="file-list" class="space-y-2">
+                    <!-- Dosyalar ve Klasörler buraya eklenecek -->
+                </div>
+            </div>
+
+            <!-- Dosya İçerik Görüntüleme -->
+            <div id="file-content-pane" class="p-6 rounded-lg bg-gray-700 shadow-lg hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="file-content-title" class="text-xl font-semibold">Dosya İçeriği</h2>
+                    <button id="back-button" class="py-1 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-md transition-colors duration-200">Geri</button>
+                </div>
+                <pre id="file-content" class="bg-gray-800 p-4 rounded-lg text-sm whitespace-pre-wrap h-[400px] overflow-auto"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mesaj Kutusu -->
+    <div id="message-box" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
+            <p id="message-text" class="text-white text-lg font-semibold mb-4"></p>
+            <button id="message-ok-button" class="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg">Tamam</button>
+        </div>
+    </div>
+
+    <script>
+        //---------------------------------------------------------
+        // GÜVENLİK BİLGİLENDİRMESİ
+        // Bu bir demo uygulamasıdır. Veriler tarayıcı belleğinde saklanır.
+        // Tarayıcı kapatıldığında tüm veriler silinir. Gerçek bir uygulama
+        // için sunucu ve veritabanı gereklidir.
+        //---------------------------------------------------------
+        
+        // ---------------------------------------------------------------------------------
+        // Kullanıcı adı ve şifreyi buradan değiştirebilirsiniz.
+        // Şifreleme kullanılmıyor, direkt metin karşılaştırması yapılıyor.
+        const USERNAME = "yagiztasyon";
+        const PASSWORD = "yagiz5454"; 
+        // ---------------------------------------------------------------------------------
+
+        const loginContainer = document.getElementById('login-container');
+        const fileManagerContainer = document.getElementById('file-manager-container');
+        const loginForm = document.getElementById('login-form');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const errorMessage = document.getElementById('error-message');
+        const logoutButton = document.getElementById('logout-button');
+        const fileListPane = document.getElementById('file-list-pane');
+        const fileContentPane = document.getElementById('file-content-pane');
+        const fileList = document.getElementById('file-list');
+        const fileContent = document.getElementById('file-content');
+        const fileContentTitle = document.getElementById('file-content-title');
+        const backButton = document.getElementById('back-button');
+        const uploadFileButton = document.getElementById('upload-file-button');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const newFolderButton = document.getElementById('new-folder-button');
+        const breadcrumbs = document.getElementById('breadcrumbs');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const messageOkButton = document.getElementById('message-ok-button');
+
+        // Sanal dosya sistemi
+        let fileSystem = {
+            'Stoklar': {
+                type: 'folder',
+                children: {
+                    'oyun-stok.txt': { type: 'file', content: 'Valorant: 10 adet\nLeague of Legends: 5 adet' },
+                    'koleksiyon.txt': { type: 'file', content: 'Efsanevi hesaplar\n...\n...' }
+                }
+            },
+            'Raporlar': {
+                type: 'folder',
+                children: {
+                    '2023-rapor.txt': { type: 'file', content: 'Yıllık satış raporu:\nToplam gelir: ...' }
+                }
+            },
+            'README.txt': { type: 'file', content: 'Bu bir Dosya Yöneticisi demosu.\nKlasörlere tıklayarak içlerine girebilirsiniz.\nDosyalara tıklayarak içeriklerini görebilirsiniz.' }
+        };
+
+        let currentDirectory = fileSystem;
+        let pathHistory = [];
+
+        function showMessage(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        messageOkButton.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        function renderFileList() {
+            fileList.innerHTML = '';
+            
+            // Eğer bir üst dizin varsa '..' ekle
+            if (pathHistory.length > 0) {
+                const backItem = document.createElement('div');
+                backItem.classList.add('flex', 'items-center', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'nav-item');
+                backItem.innerHTML = `<span class="text-xl mr-3">📁</span> <span class="font-semibold">.. (Geri)</span>`;
+                backItem.addEventListener('click', navigateUp);
+                fileList.appendChild(backItem);
+            }
+
+            for (const name in currentDirectory) {
+                const item = currentDirectory[name];
+                const itemElement = document.createElement('div');
+                itemElement.classList.add('flex', 'items-center', 'justify-between', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'file-item', 'scale-in');
+                
+                let icon = item.type === 'folder' ? '📁' : '📄';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.classList.add('font-semibold', 'flex-grow');
+                nameSpan.innerHTML = `<span class="text-xl mr-3">${icon}</span>${name}`;
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Sil';
+                deleteButton.classList.add('py-1', 'px-3', 'bg-red-500', 'hover:bg-red-600', 'text-white', 'font-semibold', 'rounded-md', 'transition-colors', 'duration-200');
+                deleteButton.setAttribute('data-name', name);
+                
+                itemElement.appendChild(nameSpan);
+                itemElement.appendChild(deleteButton);
+
+                if (item.type === 'folder') {
+                    nameSpan.addEventListener('click', () => navigateInto(name));
+                } else {
+                    nameSpan.addEventListener('click', () => showFileContent(item.content, name));
+                }
+                
+                fileList.appendChild(itemElement);
+            }
+        }
+
+        function navigateInto(folderName) {
+            if (currentDirectory[folderName] && currentDirectory[folderName].type === 'folder') {
+                pathHistory.push(folderName);
+                currentDirectory = currentDirectory[folderName].children;
+                updateBreadcrumbs();
+                renderFileList();
+            }
+        }
+
+        function navigateUp() {
+            if (pathHistory.length > 0) {
+                pathHistory.pop();
+                currentDirectory = fileSystem;
+                for (const folder of pathHistory) {
+                    currentDirectory = currentDirectory[folder].children;
+                }
+                updateBreadcrumbs();
+                renderFileList();
+            }
+        }
+
+        function showFileContent(content, fileName) {
+            fileContentTitle.textContent = fileName;
+            fileContent.textContent = content;
+
+            fileListPane.classList.add('slide-out-left');
+            fileListPane.addEventListener('animationend', () => {
+                fileListPane.classList.add('hidden');
+                fileListPane.classList.remove('slide-out-left');
+                
+                fileContentPane.classList.remove('hidden');
+                fileContentPane.classList.add('slide-in-right');
+            }, { once: true });
+        }
+        
+        backButton.addEventListener('click', () => {
+            fileContentPane.classList.remove('slide-in-right');
+            fileContentPane.classList.add('slide-out-left');
+            fileContentPane.addEventListener('animationend', () => {
+                fileContentPane.classList.add('hidden');
+                fileContentPane.classList.remove('slide-out-left');
+                
+                fileListPane.classList.remove('hidden');
+                fileListPane.classList.add('slide-in-right');
+            }, { once: true });
+        });
+
+        function updateBreadcrumbs() {
+            let path = 'Ana Dizin';
+            if (pathHistory.length > 0) {
+                path += ' / ' + pathHistory.join(' / ');
+            }
+            breadcrumbs.textContent = path;
+        }
+
+        // Login işlemi
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = usernameInput.value;
+            const password = passwordInput.value.trim();
+            
+            if (username === USERNAME && password === PASSWORD) {
+                loginContainer.classList.add('hidden');
+                fileManagerContainer.classList.remove('hidden');
+                fileManagerContainer.classList.add('opacity-100', 'fade-in');
+                renderFileList();
+            } else {
+                errorMessage.textContent = 'Hatalı kullanıcı adı veya şifre.';
+                errorMessage.classList.remove('hidden');
+            }
+        });
+
+        // Çıkış işlemi
+        logoutButton.addEventListener('click', () => {
+            fileManagerContainer.classList.add('hidden');
+            fileManagerContainer.classList.remove('opacity-100');
+            loginContainer.classList.remove('hidden');
+            usernameInput.value = '';
+            passwordInput.value = '';
+            errorMessage.classList.add('hidden');
+            pathHistory = [];
+            currentDirectory = fileSystem;
+            updateBreadcrumbs();
+        });
+
+        // Dosya yükleme
+        uploadFileButton.addEventListener('click', () => {
+            fileUploadInput.click();
+        });
+
+        fileUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                const fileName = file.name;
+                
+                if (currentDirectory[fileName]) {
+                    showMessage(`"${fileName}" adında bir dosya veya klasör zaten var.`);
+                    return;
+                }
+
+                currentDirectory[fileName] = {
+                    type: 'file',
+                    content: content
+                };
+                renderFileList();
+                showMessage(`"${fileName}" başarıyla yüklendi.`);
+            };
+            reader.readAsText(file);
+        });
+
+        // Yeni klasör oluşturma
+        newFolderButton.addEventListener('click', () => {
+            const folderName = prompt("Yeni klasör için bir isim girin:");
+            if (folderName && folderName.trim() !== '') {
+                if (currentDirectory[folderName]) {
+                    showMessage(`"${folderName}" adında bir dosya veya klasör zaten var.`);
+                    return;
+                }
+                currentDirectory[folderName] = { type: 'folder', children: {} };
+                renderFileList();
+                showMessage(`"${folderName}" klasörü oluşturuldu.`);
+            }
+        });
+
+        // Silme işlemi için olay delegasyonu
+        fileList.addEventListener('click', (e) => {
+            const deleteButton = e.target.closest('button');
+            if (deleteButton && deleteButton.textContent === 'Sil') {
+                const itemName = deleteButton.getAttribute('data-name');
+                const itemElement = deleteButton.closest('.file-item');
+                
+                itemElement.classList.add('fade-out');
+                itemElement.addEventListener('animationend', () => {
+                    delete currentDirectory[itemName];
+                    renderFileList();
+                    showMessage(`"${itemName}" başarıyla silindi.`);
+                }, { once: true });
+            }
+        });
+
+    </script>
+</body>
+</html>
