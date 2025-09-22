@@ -126,15 +126,10 @@
             <button id="message-ok-button" class="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg">Tamam</button>
         </div>
     </div>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, where, doc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-        
-        // Başlangıç verilerini harici bir dosyadan içe aktarmak yerine doğrudan buraya gömüyoruz.
-        // Bu, tarayıcıların dosya erişim kısıtlamalarını aşmamızı sağlar.
-        const initialFileSystem = [
+    
+    <!-- Stok Verilerini içeren Script Bloğu -->
+    <script>
+        const initialStocks = [
             { name: "Yönetim", type: "folder", parentPath: "" },
             { name: "Muhasebe", type: "folder", parentPath: "" },
             { name: "Pazarlama", type: "folder", parentPath: "" },
@@ -147,7 +142,14 @@
             { name: "Personel Listesi.txt", type: "file", content: "Müdür: Ali Yılmaz\nMüdür Yardımcısı: Ayşe Kara\nSatış Sorumlusu: Can Tekin", parentPath: "Yönetim" },
             { name: "SEO Raporu.txt", type: "file", content: "Web sitesi arama motoru optimizasyon (SEO) analizi.\n- Anahtar kelime sıralamaları\n- Geri bağlantı profili\n- Teknik SEO kontrolleri", parentPath: "Pazarlama" }
         ];
-
+    </script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, where, doc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+        
         // Firebase için detaylı loglamayı etkinleştir.
         setLogLevel('debug');
 
@@ -253,7 +255,8 @@
             const docs = await getDocs(filesRef);
             if (docs.empty) {
                 console.log("Veritabanı boş, varsayılan veriler yükleniyor...");
-                for (const item of initialFileSystem) {
+                // Stok verilerini burada kullanıyoruz
+                for (const item of initialStocks) {
                     await addDoc(filesRef, item);
                 }
             }
