@@ -130,6 +130,18 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, where, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Bu boş Firebase yapılandırma nesnesini, kendi bilgilerinizle değiştirin.
+        // Bilgilerinizi Firebase projenizin ayarlarından (Proje Ayarları > Genel) bulabilirsiniz.
+        const providedFirebaseConfig = {
+            apiKey: "AIzaSyB9pwv47Ep7eCUIUCD5vSZL1R2Bw3EExKU",
+            authDomain: "prestij-cd638.firebaseapp.com",
+            projectId: "prestij-cd638",
+            storageBucket: "prestij-cd638.firebasestorage.app",
+            messagingSenderId: "282776622126",
+            appId: "1:282776622126:web:b847191c620cc91fafbbbf",
+            measurementId: "G-39S022X2QW"
+        };
 
         // Global Firebase ve Uygulama Değişkenleri
         let db;
@@ -210,15 +222,13 @@
         window.onload = async () => {
             try {
                 let firebaseConfig = null;
-                // Ortam değişkeninin varlığını kontrol et
                 if (typeof __firebase_config !== 'undefined') {
+                    // Ortam değişkenini kullan
                     firebaseConfig = JSON.parse(__firebase_config);
+                } else if (providedFirebaseConfig.projectId && providedFirebaseConfig.projectId !== "YOUR_PROJECT_ID") {
+                    // Kullanıcı tarafından sağlanan yapılandırmayı kullan
+                    firebaseConfig = providedFirebaseConfig;
                 } else {
-                    console.error("Hata: __firebase_config değişkeni tanımlı değil. Uygulama Firebase'e bağlanamaz.");
-                }
-
-                if (!firebaseConfig) {
-                    console.error("Firebase yapılandırması bulunamadı. Uygulama başlatılamıyor.");
                     showMessage("Uygulama başlatılırken bir sorun oluştu: Firebase yapılandırması eksik.");
                     return;
                 }
