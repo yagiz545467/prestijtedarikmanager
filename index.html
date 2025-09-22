@@ -209,7 +209,17 @@
         // Firestore ve Kimlik Doğrulama Başlatma
         window.onload = async () => {
             try {
-                const firebaseConfig = JSON.parse(__firebase_config);
+                let firebaseConfig = null;
+                if (typeof __firebase_config !== 'undefined') {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                }
+
+                if (!firebaseConfig) {
+                    console.error("Firebase yapılandırması bulunamadı. Uygulama başlatılamıyor.");
+                    showMessage("Uygulama başlatılırken bir sorun oluştu: Firebase yapılandırması eksik.");
+                    return;
+                }
+                
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
