@@ -1,141 +1,69 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prestij Tedarik - Dosya Yönetimi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a202c;
-            color: #e2e8f0;
-        }
-        .container-bg {
-            background-color: #2d3748;
-        }
-        .card {
-            background-color: #2d3748;
-        }
-        .item-list-container {
-            min-height: 200px;
-        }
-        .file-item, .folder-item, .nav-item {
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .file-item:hover, .folder-item:hover, .nav-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out forwards;
-        }
-        .fade-out {
-            animation: fadeOut 0.3s ease-in-out forwards;
-        }
-        .scale-in {
-            animation: scaleIn 0.3s ease-in-out;
-        }
-        .slide-in-right {
-            animation: slideInRight 0.5s ease-out forwards;
-        }
-        .slide-out-left {
-            animation: slideOutLeft 0.5s ease-in forwards;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes fadeOut {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(0.95); }
-        }
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.8); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOutLeft {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(-100%); opacity: 0; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prestij Tedarik - Dosya Yönetimi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body class="flex items-center justify-center min-h-screen p-4 bg-gray-900 text-gray-100">
 
-    <!-- Login Ekranı -->
-    <div id="login-container" class="card p-8 rounded-2xl shadow-lg w-full max-w-sm transition-all duration-300 transform scale-100">
-        <h1 class="text-3xl font-bold text-center mb-6">Yönetici Girişi</h1>
-        <form id="login-form" class="space-y-4">
-            <div>
-                <label for="username" class="block text-sm font-medium mb-1">Kullanıcı Adı</label>
-                <input type="text" id="username" class="w-full p-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
-            </div>
-            <div>
-                <label for="password" class="block text-sm font-medium mb-1">Şifre</label>
-                <input type="password" id="password" class="w-full p-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
-            </div>
-            <button type="submit" class="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Giriş Yap</button>
-            <p id="error-message" class="text-red-400 text-center text-sm mt-2 hidden"></p>
-            <div id="debug-info" class="text-gray-400 text-sm mt-4 hidden">
-                <p>Oluşturulan Hash:</p>
-                <pre id="debug-hash" class="whitespace-pre-wrap break-all"></pre>
-            </div>
-        </form>
-    </div>
+  <!-- Login -->
+  <div id="login-container" class="p-6 rounded-lg bg-gray-800 shadow-md w-full max-w-sm">
+    <h1 class="text-2xl font-bold mb-4 text-center">Yönetici Girişi</h1>
+    <form id="login-form" class="space-y-3">
+      <input id="username" type="text" placeholder="Kullanıcı Adı"
+             class="w-full p-2 rounded bg-gray-700 text-gray-100">
+      <input id="password" type="password" placeholder="Şifre"
+             class="w-full p-2 rounded bg-gray-700 text-gray-100">
+      <button type="submit"
+              class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-semibold">
+        Giriş Yap
+      </button>
+      <p id="error-message" class="text-red-400 text-sm hidden">Hatalı giriş!</p>
+    </form>
+  </div>
 
-    <!-- Ana Dosya Yönetim Ekranı -->
-    <div id="file-manager-container" class="container-bg p-8 rounded-2xl shadow-lg w-full max-w-4xl transition-all duration-300 opacity-0 hidden">
-        <h1 class="text-3xl font-bold text-center mb-6">Prestij Tedarik - Dosya Yönetimi</h1>
-        <div class="flex flex-col md:flex-row justify-between items-center mb-4 space-y-2 md:space-y-0">
-            <div id="breadcrumbs" class="text-sm text-gray-400">Ana Dizin</div>
-            <div class="flex items-center space-x-2">
-                <button id="new-folder-button" class="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Yeni Klasör</button>
-                <input type="file" id="file-upload-input" class="hidden" accept=".txt">
-                <button id="upload-file-button" class="py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Dosya Yükle</button>
-                <button id="logout-button" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Çıkış Yap</button>
-            </div>
-        </div>
-        <div id="main-content" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Dosya ve Klasör Listesi -->
-            <div id="file-list-pane" class="md:col-span-2 p-6 rounded-lg bg-gray-700 shadow-lg item-list-container">
-                <h2 class="text-xl font-semibold mb-4">Dosyalar ve Klasörler</h2>
-                <div id="file-list" class="space-y-2">
-                    <!-- Dosyalar ve Klasörler buraya eklenecek -->
-                </div>
-            </div>
-            <!-- Dosya İçerik Görüntüleme -->
-            <div id="file-content-pane" class="p-6 rounded-lg bg-gray-700 shadow-lg hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 id="file-content-title" class="text-xl font-semibold">Dosya İçeriği</h2>
-                    <button id="back-button" class="py-1 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-md transition-colors duration-200">Geri</button>
-                </div>
-                <pre id="file-content" class="bg-gray-800 p-4 rounded-lg text-sm whitespace-pre-wrap h-[400px] overflow-auto"></pre>
-            </div>
-        </div>
-    </div>
-    <!-- Mesaj Kutusu -->
-    <div id="message-box" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
-        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
-            <p id="message-text" class="text-white text-lg font-semibold mb-4"></p>
-            <button id="message-ok-button" class="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg">Tamam</button>
-        </div>
-    </div>
-    
-    <!-- Firebase Script Bloğu -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, where, doc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-        
-        // 📌 Stokları dış dosyadan alıyoruz
-        import { initialStocks } from "./stocks.js";
-        
-        // Firebase için detaylı loglamayı etkinleştir.
-        setLogLevel('debug');
+  <!-- Ana ekran -->
+  <div id="file-manager-container" class="hidden p-6 rounded-lg bg-gray-800 shadow-md w-full max-w-2xl">
+    <h2 class="text-xl font-bold mb-4">Stoklar</h2>
+    <ul id="file-list" class="space-y-2"></ul>
+  </div>
+
+  <script type="module">
+    import { initialStocks } from "./stocks.js";
+
+    const loginForm = document.getElementById("login-form");
+    const errorMsg = document.getElementById("error-message");
+    const loginContainer = document.getElementById("login-container");
+    const fileManager = document.getElementById("file-manager-container");
+    const fileList = document.getElementById("file-list");
+
+    const correctUser = "prestijtedarik";
+    const correctPass = "1234"; // kolay test için düz şifre (istersen hash yaparız)
+
+    loginForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const user = document.getElementById("username").value;
+      const pass = document.getElementById("password").value;
+
+      if (user === correctUser && pass === correctPass) {
+        loginContainer.classList.add("hidden");
+        fileManager.classList.remove("hidden");
+
+        // stokları listele
+        initialStocks.forEach(stock => {
+          const li = document.createElement("li");
+          li.className = "p-3 bg-gray-700 rounded cursor-pointer hover:bg-gray-600";
+          li.textContent = stock.name;
+          li.onclick = () => alert(stock.content);
+          fileList.appendChild(li);
+        });
+
+      } else {
+        errorMsg.classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>
