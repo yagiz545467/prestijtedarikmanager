@@ -155,18 +155,6 @@
         // Enable detailed logging for Firebase.
         setLogLevel('debug');
 
-        // This empty Firebase config object should be replaced with your own.
-        // You can find your credentials in your Firebase project settings.
-        const providedFirebaseConfig = {
-            apiKey: "AIzaSyB9pwv47Ep7eCUIUCD5vSZL1R2Bw3EExKU",
-            authDomain: "prestij-cd638.firebaseapp.com",
-            projectId: "prestij-cd638",
-            storageBucket: "prestij-cd638.firebasestorage.app",
-            messagingSenderId: "282776622126",
-            appId: "1:282776622126:web:b847191c620cc91fafbbbf",
-            measurementId: "G-39S022X2QW"
-        };
-
         // Global Firebase and Application Variables
         let db;
         let auth;
@@ -211,12 +199,11 @@
                 if (typeof __firebase_config !== 'undefined') {
                     // Use environment variable
                     firebaseConfig = JSON.parse(__firebase_config);
-                } else if (providedFirebaseConfig.projectId && providedFirebaseConfig.projectId !== "YOUR_PROJECT_ID") {
-                    // Use user-provided configuration
-                    firebaseConfig = providedFirebaseConfig;
                 } else {
-                    showMessage("Uygulama başlatılırken bir sorun oluştu: Firebase yapılandırması eksik.");
-                    return;
+                    // This is a dummy config; it will be populated by the backend.
+                    firebaseConfig = {
+                        apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: ""
+                    };
                 }
                 
                 const app = initializeApp(firebaseConfig);
@@ -228,9 +215,11 @@
                         isAuthReady = true;
                         console.log("Firebase'e başarıyla bağlandı.");
                         await initializeDefaultData();
+                        loadUIAndData();
                     } else {
                         isAuthReady = false;
                         console.log("Firebase oturum açmadı.");
+                        showLoginScreen();
                     }
                 });
 
@@ -248,6 +237,21 @@
                 showMessage(message);
             }
         };
+
+        // Load UI and data after successful auth
+        function loadUIAndData() {
+            loginContainer.classList.add('hidden');
+            fileManagerContainer.classList.remove('hidden');
+            fileManagerContainer.classList.add('opacity-100', 'fade-in');
+            listenToFileSystem();
+        }
+        
+        // Show login screen
+        function showLoginScreen() {
+            fileManagerContainer.classList.add('hidden');
+            fileManagerContainer.classList.remove('opacity-100');
+            loginContainer.classList.remove('hidden');
+        }
 
         // Load default data when the application first starts
         async function initializeDefaultData() {
@@ -339,7 +343,6 @@
                 updateBreadcrumbs();
             }, (error) => {
                 console.error("Veri alınırken hata oluştu:", error);
-                // Don't show an error message, as onSnapshot works even with temporary errors.
             });
         }
 
@@ -409,10 +412,8 @@
             const hashedPassword = await sha256(password);
             
             if (username === _credentials.user && hashedPassword === _credentials.passHash) {
-                loginContainer.classList.add('hidden');
-                fileManagerContainer.classList.remove('hidden');
-                fileManagerContainer.classList.add('opacity-100', 'fade-in');
-                listenToFileSystem();
+                // Sadece UI'ı değiştir, veritabanı yüklemesi artık auth durumuna bağlı.
+                loadUIAndData();
             } else {
                 errorMessage.textContent = 'Hatalı kullanıcı adı veya şifre.';
                 errorMessage.classList.remove('hidden');
