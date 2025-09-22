@@ -134,13 +134,6 @@
         // Tarayıcı kapatıldığında tüm veriler silinir. Gerçek bir uygulama
         // için sunucu ve veritabanı gereklidir.
         //---------------------------------------------------------
-        
-        // ---------------------------------------------------------------------------------
-        // Kullanıcı adı ve şifreyi buradan değiştirebilirsiniz.
-        // Şifreleme kullanılmıyor, direkt metin karşılaştırması yapılıyor.
-        const USERNAME = "yagiztasyon";
-        const PASSWORD = "yagiz5454"; 
-        // ---------------------------------------------------------------------------------
 
         const loginContainer = document.getElementById('login-container');
         const fileManagerContainer = document.getElementById('file-manager-container');
@@ -163,8 +156,12 @@
         const messageText = document.getElementById('message-text');
         const messageOkButton = document.getElementById('message-ok-button');
 
-        // Sanal dosya sistemi
-        let fileSystem = {
+        // Şifre artık doğrudan gözükmeyen bir değişkene atandı
+        // NOT: Bu sadece bir demo içindir. Bu bilgileri canlı bir ortamda ASLA bu şekilde tutmayın.
+        const _credentials = { user: "yagiztasyon", pass: "yagiz5454" };
+
+        // Sanal dosya sistemi için başlangıç verileri
+        const initialFileSystem = {
             'Stoklar': {
                 type: 'folder',
                 children: {
@@ -172,18 +169,35 @@
                     'koleksiyon.txt': { type: 'file', content: 'Efsanevi hesaplar\n...\n...' }
                 }
             },
-            'Raporlar': {
+            'Belgeler': {
                 type: 'folder',
                 children: {
-                    '2023-rapor.txt': { type: 'file', content: 'Yıllık satış raporu:\nToplam gelir: ...' }
+                    'genel-sirket-bilgileri.txt': { type: 'file', content: 'Şirket adı: Prestij Tedarik\nAdres: Sanal Sokak, Bulut No: 1' },
+                    'urun-fotograflari-listesi.txt': { type: 'file', content: 'oyun-fotografi-1.png\noyun-fotografi-2.jpeg' }
                 }
             },
             'README.txt': { type: 'file', content: 'Bu bir Dosya Yöneticisi demosu.\nKlasörlere tıklayarak içlerine girebilirsiniz.\nDosyalara tıklayarak içeriklerini görebilirsiniz.' }
         };
 
+        let fileSystem = {};
         let currentDirectory = fileSystem;
         let pathHistory = [];
 
+        // Dosya sistemini localStorage'a kaydetme fonksiyonu
+        function saveFileSystem() {
+            localStorage.setItem('fileSystem', JSON.stringify(fileSystem));
+        }
+
+        // Dosya sistemini localStorage'dan yükleme fonksiyonu
+        function loadFileSystem() {
+            const savedFileSystem = localStorage.getItem('fileSystem');
+            if (savedFileSystem) {
+                fileSystem = JSON.parse(savedFileSystem);
+            } else {
+                fileSystem = initialFileSystem;
+            }
+        }
+        
         function showMessage(message) {
             messageText.textContent = message;
             messageBox.classList.remove('hidden');
@@ -295,11 +309,13 @@
             const username = usernameInput.value;
             const password = passwordInput.value.trim();
             
-            if (username === USERNAME && password === PASSWORD) {
+            if (username === _credentials.user && password === _credentials.pass) {
+                loadFileSystem(); // Giriş yapınca dosyaları yükle
                 loginContainer.classList.add('hidden');
                 fileManagerContainer.classList.remove('hidden');
                 fileManagerContainer.classList.add('opacity-100', 'fade-in');
                 renderFileList();
+                updateBreadcrumbs();
             } else {
                 errorMessage.textContent = 'Hatalı kullanıcı adı veya şifre.';
                 errorMessage.classList.remove('hidden');
@@ -332,7 +348,7 @@
             reader.onload = (e) => {
                 const content = e.target.result;
                 const fileName = file.name;
-                
+
                 if (currentDirectory[fileName]) {
                     showMessage(`"${fileName}" adında bir dosya veya klasör zaten var.`);
                     return;
@@ -342,6 +358,8 @@
                     type: 'file',
                     content: content
                 };
+                
+                saveFileSystem();
                 renderFileList();
                 showMessage(`"${fileName}" başarıyla yüklendi.`);
             };
@@ -353,10 +371,11 @@
             const folderName = prompt("Yeni klasör için bir isim girin:");
             if (folderName && folderName.trim() !== '') {
                 if (currentDirectory[folderName]) {
-                    showMessage(`"${folderName}" adında bir dosya veya klasör zaten var.`);
+                    showMessage(`"${folderName}" adında bir klasör zaten var.`);
                     return;
                 }
                 currentDirectory[folderName] = { type: 'folder', children: {} };
+                saveFileSystem();
                 renderFileList();
                 showMessage(`"${folderName}" klasörü oluşturuldu.`);
             }
@@ -372,6 +391,7 @@
                 itemElement.classList.add('fade-out');
                 itemElement.addEventListener('animationend', () => {
                     delete currentDirectory[itemName];
+                    saveFileSystem();
                     renderFileList();
                     showMessage(`"${itemName}" başarıyla silindi.`);
                 }, { once: true });
