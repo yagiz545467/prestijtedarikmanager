@@ -210,8 +210,11 @@
         window.onload = async () => {
             try {
                 let firebaseConfig = null;
+                // Ortam değişkeninin varlığını kontrol et
                 if (typeof __firebase_config !== 'undefined') {
                     firebaseConfig = JSON.parse(__firebase_config);
+                } else {
+                    console.error("Hata: __firebase_config değişkeni tanımlı değil. Uygulama Firebase'e bağlanamaz.");
                 }
 
                 if (!firebaseConfig) {
