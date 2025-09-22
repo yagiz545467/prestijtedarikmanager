@@ -92,7 +92,6 @@
     <!-- Ana Dosya Yönetim Ekranı -->
     <div id="file-manager-container" class="container-bg p-8 rounded-2xl shadow-lg w-full max-w-4xl transition-all duration-300 opacity-0 hidden">
         <h1 class="text-3xl font-bold text-center mb-6">Prestij Tedarik - Dosya Yönetimi</h1>
-
         <div class="flex flex-col md:flex-row justify-between items-center mb-4 space-y-2 md:space-y-0">
             <div id="breadcrumbs" class="text-sm text-gray-400">Ana Dizin</div>
             <div class="flex items-center space-x-2">
@@ -102,7 +101,6 @@
                 <button id="logout-button" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200">Çıkış Yap</button>
             </div>
         </div>
-
         <div id="main-content" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Dosya ve Klasör Listesi -->
             <div id="file-list-pane" class="md:col-span-2 p-6 rounded-lg bg-gray-700 shadow-lg item-list-container">
@@ -111,7 +109,6 @@
                     <!-- Dosyalar ve Klasörler buraya eklenecek -->
                 </div>
             </div>
-
             <!-- Dosya İçerik Görüntüleme -->
             <div id="file-content-pane" class="p-6 rounded-lg bg-gray-700 shadow-lg hidden">
                 <div class="flex justify-between items-center mb-4">
@@ -122,7 +119,6 @@
             </div>
         </div>
     </div>
-
     <!-- Mesaj Kutusu -->
     <div id="message-box" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
         <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
@@ -130,16 +126,16 @@
             <button id="message-ok-button" class="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg">Tamam</button>
         </div>
     </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, getDoc, doc, addDoc, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, where, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Firebase ve Uygulama Değişkenleri
         let db;
         let auth;
-        let currentPath = '/';
+        let isAuthReady = false;
+        let currentPath = ''; // Root için boş string
         let pathHistory = [];
 
         // Güvenlik Kimlik Bilgileri
@@ -172,7 +168,45 @@
         const messageText = document.getElementById('message-text');
         const messageOkButton = document.getElementById('message-ok-button');
 
-        // Firestore ve Kimlik Doğrulama
+        // Sanal dosya sistemi için başlangıç verileri
+        const initialFileSystem = [
+            {
+                name: 'Stoklar',
+                type: 'folder',
+                parentPath: ''
+            },
+            {
+                name: 'Belgeler',
+                type: 'folder',
+                parentPath: ''
+            },
+            {
+                name: 'oyun-stok.txt',
+                type: 'file',
+                content: 'Valorant: 10 adet\nLeague of Legends: 5 adet',
+                parentPath: 'Stoklar'
+            },
+            {
+                name: 'koleksiyon.txt',
+                type: 'file',
+                content: 'Efsanevi hesaplar\n...\n...',
+                parentPath: 'Stoklar'
+            },
+            {
+                name: 'genel-sirket-bilgileri.txt',
+                type: 'file',
+                content: 'Şirket adı: Prestij Tedarik\nAdres: Sanal Sokak, Bulut No: 1',
+                parentPath: 'Belgeler'
+            },
+            {
+                name: 'README.txt',
+                type: 'file',
+                content: 'Bu bir Dosya Yöneticisi demosu.',
+                parentPath: ''
+            }
+        ];
+
+        // Firestore ve Kimlik Doğrulama Başlatma
         window.onload = async () => {
             try {
                 const firebaseConfig = JSON.parse(__firebase_config);
@@ -180,29 +214,42 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        isAuthReady = true;
+                        console.log("Firebase'e başarıyla bağlandı.");
+                        await initializeDefaultData();
+                    } else {
+                        isAuthReady = false;
+                        console.log("Firebase oturum açmadı.");
+                    }
+                });
+
                 if (typeof __initial_auth_token !== 'undefined') {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-
-                // onAuthStateChanged ile oturum durumunu dinle
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        console.log("Firebase'e başarılı bir şekilde bağlandı.");
-                        // Giriş yapıldıysa dosya listesini dinle
-                        listenToFileSystem();
-                    } else {
-                        console.log("Firebase oturum açmadı.");
-                    }
-                });
-
             } catch (e) {
                 console.error("Firebase'i başlatırken bir hata oluştu:", e);
                 showMessage("Veritabanına bağlanılamadı. Lütfen tekrar deneyin.");
             }
         };
 
+        // Uygulama ilk açıldığında varsayılan verileri yükle
+        async function initializeDefaultData() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const filesRef = collection(db, `artifacts/${appId}/public/data/files`);
+
+            const docs = await getDocs(filesRef);
+            if (docs.empty) {
+                console.log("Veritabanı boş, varsayılan veriler yükleniyor...");
+                for (const item of initialFileSystem) {
+                    await addDoc(filesRef, item);
+                }
+            }
+        }
+        
         // SHA-256 Hash Fonksiyonu
         async function sha256(message) {
             const textAsBuffer = new TextEncoder().encode(message);
@@ -212,13 +259,11 @@
             return hexHash;
         }
         
-        // Mesaj Kutusu Göster
         function showMessage(message) {
             messageText.textContent = message;
             messageBox.classList.remove('hidden');
         }
 
-        // Mesaj Kutusu Kapat
         messageOkButton.addEventListener('click', () => {
             messageBox.classList.add('hidden');
         });
@@ -236,15 +281,13 @@
                     items.push({ id: doc.id, ...doc.data() });
                 });
 
-                // Önce klasörleri, sonra dosyaları sırala
                 items.sort((a, b) => {
                     if (a.type === 'folder' && b.type !== 'folder') return -1;
                     if (a.type !== 'folder' && b.type === 'folder') return 1;
                     return a.name.localeCompare(b.name);
                 });
 
-                // Geri butonu
-                if (currentPath !== '/') {
+                if (currentPath !== '') {
                     const backItem = document.createElement('div');
                     backItem.classList.add('flex', 'items-center', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'nav-item');
                     backItem.innerHTML = `<span class="text-xl mr-3">📁</span> <span class="font-semibold">.. (Geri)</span>`;
@@ -252,7 +295,6 @@
                     fileList.appendChild(backItem);
                 }
 
-                // Dosya ve klasörleri listele
                 items.forEach(item => {
                     const itemElement = document.createElement('div');
                     itemElement.classList.add('flex', 'items-center', 'justify-between', 'p-3', 'rounded-lg', 'bg-gray-800', 'hover:bg-gray-700', 'transition-colors', 'duration-200', 'file-item', 'scale-in');
@@ -283,19 +325,19 @@
                 updateBreadcrumbs();
             }, (error) => {
                 console.error("Veri alınırken hata oluştu:", error);
-                showMessage("Dosyalara erişilemiyor. Lütfen tekrar deneyin.");
+                // Hata mesajını göstermeyin, çünkü onSnapshot bazen geçici hatalarda da çalışır.
             });
         }
 
-        async function navigateInto(folderName) {
+        function navigateInto(folderName) {
             pathHistory.push(folderName);
             currentPath = pathHistory.join('/');
             listenToFileSystem();
         }
 
-        async function navigateUp() {
+        function navigateUp() {
             pathHistory.pop();
-            currentPath = pathHistory.length === 0 ? '/' : pathHistory.join('/');
+            currentPath = pathHistory.length === 0 ? '' : pathHistory.join('/');
             listenToFileSystem();
         }
 
@@ -333,7 +375,6 @@
             breadcrumbs.textContent = path;
         }
 
-        // Şifre alanına bir şey yazıldığında hash'i göster
         passwordInput.addEventListener('input', async (e) => {
             const typedPassword = e.target.value.trim();
             if (typedPassword.length > 0) {
@@ -345,7 +386,6 @@
             }
         });
 
-        // Login işlemi
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = usernameInput.value;
@@ -357,13 +397,13 @@
                 loginContainer.classList.add('hidden');
                 fileManagerContainer.classList.remove('hidden');
                 fileManagerContainer.classList.add('opacity-100', 'fade-in');
+                listenToFileSystem();
             } else {
                 errorMessage.textContent = 'Hatalı kullanıcı adı veya şifre.';
                 errorMessage.classList.remove('hidden');
             }
         });
 
-        // Çıkış işlemi
         logoutButton.addEventListener('click', () => {
             fileManagerContainer.classList.add('hidden');
             fileManagerContainer.classList.remove('opacity-100');
@@ -371,12 +411,11 @@
             usernameInput.value = '';
             passwordInput.value = '';
             errorMessage.classList.add('hidden');
-            currentPath = '/';
+            currentPath = '';
             pathHistory = [];
             updateBreadcrumbs();
         });
 
-        // Dosya yükleme
         uploadFileButton.addEventListener('click', () => {
             fileUploadInput.click();
         });
@@ -389,6 +428,11 @@
             reader.onload = async (e) => {
                 const content = e.target.result;
                 const fileName = file.name;
+                
+                if (!isAuthReady) {
+                    showMessage("Kimlik doğrulaması henüz tamamlanmadı. Lütfen bekleyip tekrar deneyin.");
+                    return;
+                }
 
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -409,10 +453,13 @@
             reader.readAsText(file);
         });
 
-        // Yeni klasör oluşturma
         newFolderButton.addEventListener('click', async () => {
             const folderName = prompt("Yeni klasör için bir isim girin:");
             if (folderName && folderName.trim() !== '') {
+                if (!isAuthReady) {
+                    showMessage("Kimlik doğrulaması henüz tamamlanmadı. Lütfen bekleyip tekrar deneyin.");
+                    return;
+                }
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                     const filesRef = collection(db, `artifacts/${appId}/public/data/files`);
@@ -430,12 +477,15 @@
             }
         });
 
-        // Silme işlemi için olay delegasyonu
         fileList.addEventListener('click', async (e) => {
             const deleteButton = e.target.closest('button');
             if (deleteButton && deleteButton.textContent === 'Sil') {
                 const docId = deleteButton.getAttribute('data-id');
-                const itemName = deleteButton.previousElementSibling.textContent.trim().replace(/^. /, ''); // İkonu çıkar
+                const itemName = deleteButton.previousElementSibling.textContent.trim().replace(/^. /, '');
+                if (!isAuthReady) {
+                    showMessage("Kimlik doğrulaması henüz tamamlanmadı. Lütfen bekleyip tekrar deneyin.");
+                    return;
+                }
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                     await deleteDoc(doc(db, `artifacts/${appId}/public/data/files`, docId));
